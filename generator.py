@@ -4,16 +4,25 @@ from diffusers.models import FluxMultiControlNetModel
 from detector.groundingdino_sam import GroundingdinoSam
 
 class Generator:
-    def __init__(self, base_model, controlnet_model_union, flux_redux, flux_fill, dino_checkpoint, sam_checkpoint, offload):
+    def __init__(self, 
+                 base_model, 
+                 controlnet_model_union, 
+                 flux_redux, 
+                 flux_fill, 
+                 dino_checkpoint, 
+                 sam_checkpoint, 
+                 offload,
+                 lora_weights = None
+                 ):
         # load models
         controlnet_union = FluxControlNetModel.from_pretrained(controlnet_model_union, torch_dtype=torch.bfloat16)
         controlnet = FluxMultiControlNetModel([controlnet_union]) # we always recommend loading via FluxMultiControlNetModel
-        self.pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained(flux_redux, torch_dtype=torch.bfloat16).to('cuda')
         self.pipe = FluxControlNetPipeline.from_pretrained(base_model, 
                                                            controlnet=controlnet, 
-                                                           text_encoder=None,
-                                                           text_encoder_2=None,
                                                            torch_dtype=torch.bfloat16)
+        self.pipe.load_lora_weights(lora_weights)
+        self.pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained(flux_redux, torch_dtype=torch.bfloat16).to('cuda')
+
         self.groundingdino_sam = GroundingdinoSam(dino_checkpoint, sam_checkpoint)
         self.pipe2 = FluxFillPipeline.from_pretrained(flux_fill, 
                                                     text_encoder=None,
@@ -26,15 +35,18 @@ class Generator:
             self.pipe.to("cuda")
             self.pipe2.to('cuda')
 
-    def stage1(self, global_style_image, control_image, seed, **kwargs):
+    def stage1(self, control_image, seed, global_style_image=None, prompt=None, **kwargs):
         kwargs_ = {
             'controlnet_conditioning_scale':[0.4],
             'num_inference_steps':20, 
             'guidance_scale':3.5
             }
         kwargs_.update(kwargs) # you may specify kwargs
-
-        global_style_input = self.pipe_prior_redux(global_style_image)
+        assert (global_style_image or prompt) and not (global_style_image and prompt)
+        if prompt == None:
+            global_style_input = self.pipe_prior_redux(global_style_image)
+        else:
+            global_style_input = {'prompt': prompt}
         image_stage1 = self.pipe(
             #prompt, 
             **global_style_input,
