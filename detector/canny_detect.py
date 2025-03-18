@@ -38,3 +38,34 @@ class CannyDetect:
         # 显示结果
         canny_image = Image.fromarray(canny_image)
         return canny_image
+    
+    def polygon2canny_2(self, polygon_points_list, h, w):
+        
+        # 创建一个空白图像，大小为 (h, w)
+        image = np.zeros((h, w), dtype=np.uint8)
+
+        # 计算多边形的最小和最大坐标
+        all_points = np.concatenate(polygon_points_list)
+        x_coords, y_coords = all_points[:, 0], all_points[:, 1]
+        min_x, min_y = x_coords.min(), y_coords.min()
+        max_x, max_y = x_coords.max(), y_coords.max()
+
+        # 计算缩放比例，保持纵横比缩放到画布大小
+        scale_x = w / (max_x - min_x) if max_x > min_x else 1
+        scale_y = h / (max_y - min_y) if max_y > min_y else 1
+        scale = min(scale_x, scale_y)
+
+        # 将多边形缩放并绘制到画布中
+        for polygon_points in polygon_points_list:
+            polygon_points = np.array(polygon_points, dtype=np.float32)
+            # 缩放并调整到画布左上角
+            polygon_points[:, 0] = (polygon_points[:, 0] - min_x) * scale
+            polygon_points[:, 1] = (polygon_points[:, 1] - min_y) * scale
+            polygon_points = polygon_points.astype(np.int32)
+            cv2.polylines(image, [polygon_points], isClosed=True, color=255, thickness=2)
+
+        # 使用 Canny 边缘检测
+        canny_image = self.processor(image, low_threshold=50, high_threshold=200, detect_resolution=1024, image_resolution=1024)
+        # 转换为 PIL 格式返回
+        canny_image = Image.fromarray(canny_image)
+        return canny_image
