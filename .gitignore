@@ -3,3 +3,4 @@ imgs/
 results/
 data/
 ckpt/
+wandb/

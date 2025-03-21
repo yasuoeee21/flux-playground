@@ -4,6 +4,7 @@ import math
 import torch.nn.functional as F
 import torch
 from typing import Union
+import cv2
 
 def mask_rgb(mask, image_rgb, mask_color = (255,255,255)):
     return Image.fromarray(np.where(mask[0].unsqueeze(-1), np.array(image_rgb), np.array(mask_color)[None,None,:]).astype('uint8'))
@@ -39,3 +40,49 @@ def image_grid(imgs, rows, cols):
 
 def down_size(image: Image.Image, down_scale = 2):
     return image.resize((image.size[0]//down_scale, image.size[1]//down_scale))
+
+
+def polygon_to_mask(polygon_points, height, width):
+    # 创建空白的 0/1 mask
+    mask = np.zeros((height, width), dtype=np.uint8)
+    
+    # 将坐标转换为整数格式并调整为适合 OpenCV 的格式
+    polygon = np.array(polygon_points, dtype=np.int32)
+    polygon = polygon.reshape((-1, 1, 2))
+    
+    # 填充多边形，生成 0/1 mask
+    cv2.fillPoly(mask, [polygon], color=1)
+    
+    # 将 mask 转换成 torch tensor
+    mask_tensor = torch.from_numpy(mask).float()
+    
+    return mask_tensor
+
+def resize_img_tensor(tensor, size):
+    assert tensor.dim() == 2 # h,w
+    return F.interpolate(tensor.unsqueeze(0).unsqueeze(0), size).squeeze()
+
+def get_mask_ori(polygon_points, height, width, height_lt, width_lt):
+    mask_ori = polygon_to_mask(polygon_points, height, width)
+    mask_ori = resize_img_tensor(mask_ori, (height_lt, width_lt))
+    return mask_ori
+
+def get_mask_ref(mask_ori):
+    return resize_img_tensor(mask_ori, (27, 27))
+
+def get_min_bounding_box(tensor):
+    # 找到所有值为1的点的坐标
+    rows, cols = torch.where(tensor == 1)
+    
+    if len(rows) == 0:  # 如果没有1，直接返回原数组
+        return tensor
+    
+    # 计算最小包围框的边界
+    min_row, max_row = torch.min(rows), torch.max(rows)
+    min_col, max_col = torch.min(cols), torch.max(cols)
+    
+    # 创建新的数组，填充最小包围框为1
+    result = torch.zeros_like(tensor)
+    result[min_row:max_row+1, min_col:max_col+1] = 1
+    
+    return result

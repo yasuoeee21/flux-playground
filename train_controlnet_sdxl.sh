@@ -1,0 +1,20 @@
+export CUDA_VISIBLE_DEVICES=0
+accelerate launch --main_process_port 30000 --config_file=/amax/hchuz/architectural_heritage/configs/deepspeed.yaml train_controlnet_sdxl.py \
+  --pretrained_model_name_or_path="stabilityai/stable-diffusion-xl-base-1.0" \
+  --jsonl_for_train="/amax/hchuz/architectural_heritage/data/control/proc.jsonl" \
+  --output_dir="results/controlnet_sdxl_fp32" \
+  --mixed_precision="no" \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=4 \
+  --learning_rate=1e-4 \
+  --report_to="wandb" \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=0 \
+  --max_train_steps=5000 \
+  --validation_image="/amax/hchuz/architectural_heritage/data/control/SegmentationClass/Snipaste_2023-02-21_12-59-54.png" \
+  --validation_prompt="The building in the image appears to be constructed using a combination of materials that give it a classic and somewhat historical appearance. Here are some observations about the materials:\n\n1. **Facade**: The exterior facade seems to be made of stone or a stone-like material, possibly concrete or stucco, which has been painted or finished to resemble stone. The texture and color suggest a durable, solid material.\n\n2. **Windows**: The windows have decorative frames, likely made of wood or a composite material designed to mimic wood. The design includes intricate details and moldings, which are characteristic of traditional architecture.\n\n3. **Balconies and Railings**: The balconies and railings appear to be made of metal, possibly wrought iron or a similar material, which is often used for its strength and decorative potential.\n\n4. **Signage**: The signage on the building is made of a smooth, possibly metallic or plastic material, with engraved or painted characters. The central sign is framed with a decorative border, suggesting attention to aesthetic detail.\n\n5. **Lighting**: The building is illuminated with modern lighting fixtures, which are likely made of metal and glass, providing a warm, inviting glow.\n\nOverall, the building combines traditional architectural elements with modern materials, creating a visually appealing and functional structure." \
+  --seed="0"  \
+  --validation_steps=100 \
+  --checkpointing_steps=1000 \
+  --pretrained_vae_model_name_or_path="madebyollin/sdxl-vae-fp16-fix" 
+#  --gradient_checkpointing \

@@ -8,9 +8,9 @@ class Generator:
                  base_model, 
                  controlnet_model_union, 
                  flux_redux, 
-                 dino_checkpoint, 
-                 sam_checkpoint, 
                  offload,
+                 dino_checkpoint=None, 
+                 sam_checkpoint=None, 
                  flux_fill=None,
                  lora_weights = None,
                  no_control = False
@@ -27,8 +27,8 @@ class Generator:
         if lora_weights != None:
             self.pipe.load_lora_weights(lora_weights)
         self.pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained(flux_redux, torch_dtype=torch.bfloat16).to('cuda')
-
-        self.groundingdino_sam = GroundingdinoSam(dino_checkpoint, sam_checkpoint)
+        if dino_checkpoint != None and sam_checkpoint != None:
+            self.groundingdino_sam = GroundingdinoSam(dino_checkpoint, sam_checkpoint)
         if flux_fill != None:
             self.pipe2 = FluxFillPipeline.from_pretrained(flux_fill, 
                                                         text_encoder=None,
@@ -61,8 +61,8 @@ class Generator:
             **global_style_input,
             control_image=[control_image],
             control_mode=[0], # 0~canny https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union
-            width=control_image.width,
-            height=control_image.height,
+            width=global_style_image.width//16*16,
+            height=global_style_image.height//16*16,
             generator=torch.manual_seed(seed),
             **kwargs_
         ).images[0]
