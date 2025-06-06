@@ -39,7 +39,7 @@ def image_grid(imgs, rows, cols):
     return grid
 
 def down_size(image: Image.Image, down_scale = 2):
-    return image.resize((image.size[0]//down_scale, image.size[1]//down_scale))
+    return image.resize((int(image.size[0]//down_scale), int(image.size[1]//down_scale)))
 
 
 def polygon_to_mask(polygon_points, height, width):

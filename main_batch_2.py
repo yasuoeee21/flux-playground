@@ -17,7 +17,7 @@ flux_redux = 'black-forest-labs/FLUX.1-Redux-dev'
 offload = True
 seeds = [111, 222, 333, 444]
 batch_size = len(seeds)
-output_dir = 'results/imgs_eval_temp'
+output_dir = 'results/imgs_eval_training'
 os.makedirs(output_dir, exist_ok=True)
 
 # load models
@@ -39,14 +39,15 @@ kwargs = {
     'num_images_per_prompt': 1
     }
 
-data_dir = '/amax/hchuz/Image-to-Graph/dataset/original'
+data_dir = '/amax/hchuz/architectural_heritage/data/training'
 names = [name[:-len('.png')] for name in os.listdir(data_dir) if name.endswith('.png')]
 
 for name in tqdm(names):
-    with open(os.path.join(data_dir, name+'.json'), 'r') as f:
-        data = json.load(f)
+    # with open(os.path.join(data_dir, name+'.json'), 'r') as f:
+    #     data = json.load(f)
     global_style_image = Image.open(os.path.join(data_dir, name+'.png')).convert('RGB')
-    control_image = cannydetect.polygon2canny_2([sample['points'] for sample in data['shapes']], global_style_image.height, global_style_image.width)
+    control_image = cannydetect.det_canny(global_style_image)
+    #control_image = cannydetect.polygon2canny_2([sample['points'] for sample in data['shapes']], global_style_image.height, global_style_image.width)
     control_image.save(os.path.join(output_dir, f'{name}_control.png'))
     global_style_input = pipe_prior_redux(global_style_image)
     global_style_input['prompt_embeds'] = global_style_input['prompt_embeds'].repeat(batch_size, 1, 1)

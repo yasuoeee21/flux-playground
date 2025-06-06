@@ -1,12 +1,12 @@
 import torch
-from diffusers import FluxControlNetPipeline, FluxControlNetModel, FluxPriorReduxPipeline, FluxFillPipeline, FluxPipeline
+from diffusers import FluxControlNetPipeline, FluxControlNetModel, FluxPriorReduxPipeline, FluxFillPipeline, FluxPipeline, FluxControlPipeline
 from diffusers.models import FluxMultiControlNetModel
 from detector.groundingdino_sam import GroundingdinoSam
 
 class Generator:
     def __init__(self, 
                  base_model, 
-                 controlnet_model_union, 
+                 control_model, 
                  flux_redux, 
                  offload,
                  dino_checkpoint=None, 
@@ -16,14 +16,32 @@ class Generator:
                  no_control = False
                  ):
         # load models
-        controlnet_union = FluxControlNetModel.from_pretrained(controlnet_model_union, torch_dtype=torch.bfloat16)
-        controlnet = FluxMultiControlNetModel([controlnet_union]) # we always recommend loading via FluxMultiControlNetModel
+        self.base_model = base_model
+        self.control_model = control_model
+        self.no_control = no_control
+        if 'ControlNet' in control_model:
+            controlnet_union = FluxControlNetModel.from_pretrained(control_model, torch_dtype=torch.bfloat16)
+            controlnet = FluxMultiControlNetModel([controlnet_union]) # we always recommend loading via FluxMultiControlNetModel
         if no_control:
             self.pipe = FluxPipeline.from_pretrained(base_model, torch_dtype=torch.bfloat16)
         else:
-            self.pipe = FluxControlNetPipeline.from_pretrained(base_model, 
-                                                           controlnet=controlnet, 
-                                                           torch_dtype=torch.bfloat16)
+            if 'Depth' in control_model:
+                self.pipe = FluxControlPipeline.from_pretrained(base_model, 
+                                                text_encoder=None,
+                                                text_encoder_2=None,
+                                                torch_dtype=torch.bfloat16)
+                self.pipe.load_lora_weights(control_model, adapter_name="depth")
+                
+            if 'Canny' in control_model:
+                self.pipe = FluxControlPipeline.from_pretrained(base_model, 
+                                                text_encoder=None,
+                                                text_encoder_2=None,
+                                                torch_dtype=torch.bfloat16)
+                self.pipe.load_lora_weights(control_model, adapter_name="canny")
+            else:
+                self.pipe = FluxControlNetPipeline.from_pretrained(base_model, 
+                                                controlnet=controlnet, 
+                                                torch_dtype=torch.bfloat16)
         if lora_weights != None:
             self.pipe.load_lora_weights(lora_weights)
         self.pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained(flux_redux, torch_dtype=torch.bfloat16).to('cuda')
@@ -44,12 +62,22 @@ class Generator:
             if flux_fill != None:
                 self.pipe2.to('cuda')
 
-    def stage1(self, control_image, seed, global_style_image=None, prompt=None, **kwargs):
-        kwargs_ = {
-            'controlnet_conditioning_scale':[0.4],
-            'num_inference_steps':20, 
-            'guidance_scale':3.5
-            }
+    def stage1(self, seed, global_style_image=None, prompt=None, **kwargs):
+        if 'cond_scale' in kwargs:
+            self.pipe.set_adapters("canny", kwargs.pop('cond_scale'))
+        if 'dev' in self.base_model:
+            kwargs_ = {
+                'num_inference_steps':20, 
+                'guidance_scale':3.5
+                }
+        else:
+            kwargs_ = {
+                'num_inference_steps':4, 
+                'guidance_scale':0.0
+                }
+        if 'ControlNet' in  self.control_model and not self.no_control:
+            kwargs_['controlnet_conditioning_scale'] = [0.4]
+            kwargs_['control_mode'] = [0]
         kwargs_.update(kwargs) # you may specify kwargs
         assert (global_style_image or prompt) and not (global_style_image and prompt)
         if global_style_image != None:
@@ -59,8 +87,8 @@ class Generator:
         image_stage1 = self.pipe(
             prompt, 
             **global_style_input,
-            control_image=[control_image],
-            control_mode=[0], # 0~canny https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union
+            #control_image=[control_image],
+            #control_mode=[0], # 0~canny https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union
             width=global_style_image.width//16*16,
             height=global_style_image.height//16*16,
             generator=torch.manual_seed(seed),

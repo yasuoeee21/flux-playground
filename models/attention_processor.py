@@ -81,19 +81,21 @@ class FluxAttnProcessor2_0_my:
         hidden_states = F.scaled_dot_product_attention(
             query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False
         )
+
+        
         hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
         hidden_states = hidden_states.to(query.dtype)
 
-        if self.masks != None:
-            assert len(self.masks) == hidden_states.shape[0] - 1
-            canvas = hidden_states[1:, self.num_ref_img_tokens:, :]
-            #print(canvas.shape)
-            canvas *= self.masks.to(hidden_states.device, hidden_states.dtype)
-            canvas = canvas.mean(0, keepdim=True)
-            #print(hidden_states[:1, self.num_ref_img_tokens:, :][self.masks.repeat(1,1,hidden_states.shape[-1])].shape)
-            hidden_states[:1, self.num_ref_img_tokens:, :][self.masks.repeat(1,1,hidden_states.shape[-1])] = canvas[self.masks.repeat(1,1,hidden_states.shape[-1])]
-            hidden_states[1:, self.num_ref_img_tokens:, :] = hidden_states[:1, self.num_ref_img_tokens:, :]
-        #print(hidden_states.shape)
+        # if self.masks != None:
+        #     assert len(self.masks) == hidden_states.shape[0] - 1
+        #     canvas = hidden_states[1:, self.num_ref_img_tokens:, :]
+        #     #print(canvas.shape)
+        #     canvas *= self.masks.to(hidden_states.device, hidden_states.dtype)
+        #     canvas = canvas.mean(0, keepdim=True)
+        #     #print(hidden_states[:1, self.num_ref_img_tokens:, :][self.masks.repeat(1,1,hidden_states.shape[-1])].shape)
+        #     hidden_states[:1, self.num_ref_img_tokens:, :][self.masks.repeat(1,1,hidden_states.shape[-1])] = canvas[self.masks.repeat(1,1,hidden_states.shape[-1])]
+        #     hidden_states[1:, self.num_ref_img_tokens:, :] = hidden_states[:1, self.num_ref_img_tokens:, :]
+        # #print(hidden_states.shape)
 
         if encoder_hidden_states is not None:
             encoder_hidden_states, hidden_states = (

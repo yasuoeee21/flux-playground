@@ -7,6 +7,9 @@ class CannyDetect:
     def __init__(self):
         self.processor = CannyDetector()
     
+    def det_canny(self, image):
+        return self.processor(image, low_threshold=50, high_threshold=200, detect_resolution=1024, image_resolution=1024)
+
     def polygon2canny(self, polygon_points_list):
         # 计算图像宽高（根据多边形的坐标动态调整）
         all_points = np.concatenate(polygon_points_list)  # 将所有多边形的点合并为一个数组
